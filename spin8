@@ -1,0 +1,50 @@
+#!/usr/bin/env php
+
+<?php
+
+use Spin8\Console\Console;
+
+//requiring the autoloader
+$autoloader = __DIR__ . '/vendor/autoload.php';
+
+if (!file_exists($autoloader) || !is_readable($autoloader)) {
+    throw new RuntimeException("[Spin8] Can't require the autoloader in ".basename(__FILE__).", it's either missing or non-readable. Check the autoloader in {$autoloader}");
+}
+
+require_once $autoloader;
+
+
+
+//including the wordpress functions
+define('WP_USE_THEMES', false);
+require_once __DIR__.'/../../../wp-load.php';
+
+
+
+
+//loading the environment vars
+$dotenv = Dotenv\Dotenv::createImmutable(__DIR__);
+$dotenv->load();
+
+
+
+
+//bootstrapping up the framework
+require __DIR__.'/vendor/spin8/framework/src/bootstrap.php';
+
+
+
+
+
+//executing the command
+if($argc === 0 || $argv[0] !== 'spin8') {
+    throw new RuntimeException("Can not call Spin8 Console 'binary' (spin8 file) outside of the 'php spin8' command context.");
+}
+
+$console = new Console();
+
+try{
+    $console->handle(array_splice($argv, 1));
+} catch(Throwable $e) {
+    echo $e->getMessage().PHP_EOL.PHP_EOL;
+}

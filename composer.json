@@ -1,0 +1,38 @@
+{
+    "name": "spin8/project_template",
+    "description": "The Spin8 standard project template, the beginning of every Spin8 project.",
+    "keywords": [
+        "spin8",
+        "wordpress",
+        "wordpress-plugin"
+    ],
+    "authors": [
+        {
+            "name": "Talpx1",
+            "homepage": "https://github.com/Talpx1"
+        }
+    ],
+    "license": "proprietary",
+    "minimum-stability": "dev",
+    "prefer-stable": true,
+    "autoload": {
+        "psr-4": {}
+    },
+    "autoload-dev": {
+        "psr-4": {
+            "Tests\\": "tests/"
+        },
+        "classmap": []
+    },
+    "config": {
+        "sort-packages": true,
+        "optimize-autoloader": true,
+        "preferred-install": "dist"
+    },
+    "require": {
+        "php": "^8.3",
+        "spin8/framework": "dev-master",
+        "symfony/var-dumper": "^7.0",
+        "vlucas/phpdotenv": "^5.6"
+    }
+}
