@@ -29,7 +29,7 @@ $dotenv->load();
 
 
 
-//bootstrapping up the framework
+//bootstrapping the framework
 require __DIR__.'/vendor/spin8/framework/src/bootstrap.php';
 
 
