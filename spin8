@@ -2,8 +2,6 @@
 
 KERNEL="$(uname -s)"
 CONTAINER_NAME="spin8_wordpress"
-HELP_ALIASES=("help" "-h" "-help" "--help")
-BASH_HANDLED_COMMANDS=("install" "up" "down")
 
 function check_kernel {
     case "$KERNEL" in
@@ -55,7 +53,7 @@ function check_if_docker_compose_exists {
 }
 
 function check_if_container_is_running {
-    if [ "$( docker container inspect -f '{{.State.Status}}' $CONTAINER_NAME )" == "running" ]; then
+    if docker ps -q -f name="$CONTAINER_NAME" | grep "$CONTAINER_NAME" 2> /dev/null; then
         IS_CONTAINER_RUNNING=true
     else
         IS_CONTAINER_RUNNING=false
@@ -63,10 +61,10 @@ function check_if_container_is_running {
 }
 
 function detect_docker_compose_command {
-    if ! command -v docker-compose &> /dev/null then
-        DOCKER_COMPOSE="docker compose"
-    else
+    if command -v docker-compose &> /dev/null; then
         DOCKER_COMPOSE="docker-compose"
+    else
+        DOCKER_COMPOSE="docker compose"
     fi
 }
 
@@ -75,19 +73,22 @@ function exec_command {
         help_command
     fi
 
-    if [[ ${BASH_HANDLED_COMMANDS[@]} =~ "\<${1}\>" ]]; then
+    if [[ "$1" == 'install' || "$1" == 'up' || "$1" == 'down' ]]; then
         "${1}_command"
     fi
 
-    if [[ "$IS_CONTAINER_RUNNING" == true ]] 
+
+
+    if [[ "$IS_CONTAINER_RUNNING" == true ]]; then
+    echo "YES"
         proxy_command_to_php
     else
-        if [[ ${HELP_ALIASES[@]} =~ "\<${1}\>" ]]; then
+        if [[ "$1" == "help" || "$1" == "-h" || "$1" == "-help" || "$1" == "--help" ]]; then
             help_command
         else
             echo "Invalid command $1"
             echo
-            help_command "$1"
+            help_command
         fi
     fi
 }
@@ -114,7 +115,9 @@ function install_command {
 }
 
 function up_command {
-    echo "UP"
+    detect_docker_compose_command
+
+    "$DOCKER_COMPOSE up -d" #FIXME
 
     exit 1
 }
@@ -147,4 +150,4 @@ check_kernel
 check_if_docker_is_running
 check_if_docker_compose_exists
 check_if_container_is_running
-exec_command
+exec_command $@
