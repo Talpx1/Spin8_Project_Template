@@ -1,8 +1,29 @@
 #!/usr/bin/env bash
 
-#OS Check
-if [[ "$OSTYPE" != "linux-gnu"* ]] || [[ "$OSTYPE" != "darwin"* ]]; then
-    echo "Unsupported OS ($OSTYPE)."
+KERNEL="$(uname -s)"
+CONTAINER_NAME="spin8_wordpress"
+HELP_ALIASES=("help" "-h" "-help" "--help")
+BASH_HANDLED_COMMANDS=("install" "up" "down")
+
+function check_kernel {
+    case "$KERNEL" in
+        Linux*) 
+            KERNEL="Linux"
+        ;;
+
+        Darwin*)           
+            KERNEL="Darwin"
+        ;;
+
+        *)                  
+            KERNEL="unsupported"
+            display_usupported_kernel_message
+        ;;
+    esac
+}
+
+function display_usupported_kernel_message {
+    echo "Unsupported OS ($KERNEL)."
     echo "You won't be able to use spin8 install/build/up/down/recreate."
     echo
     echo "!!! If you are on windows, install and run Spin8 inside WSL2 to use all the features !!!"
@@ -10,7 +31,120 @@ if [[ "$OSTYPE" != "linux-gnu"* ]] || [[ "$OSTYPE" != "darwin"* ]]; then
     echo "You can still run Spin8 manually with these steps:" 
     echo "1. copy the .env.example file and rename the coiped file .env" 
     echo "2. customize the settings in the .env file" 
-    echo "3. start the containers using 'docker compose up -d'" 
+    echo "3. start the containers using 'docker compose up -d' or 'docker-compose up -d'" 
     echo "4. install and configure wordpress using 'docker exec spin8_wordpress spin8_install_wp'" 
-    echo "5. use any other Spin8 command via './vendor/bin/spin8 command'" 
-fi
+    echo "5. use any other Spin8 command via './vendor/bin/spin8 <command>'" 
+
+    exit 1
+}
+
+function check_if_docker_is_running {
+    if ! docker info > /dev/null 2>&1; then
+        echo "Docker is not running, please start docker and try again."
+        exit 1
+    fi
+}
+
+function check_if_docker_compose_exists {
+    if [ ! -f "docker-compose.yml" ]; then
+        echo "Unable to find docker-compose.yml"
+        echo "Your installation may be corrupted, please clone the Spin8 Project Template repo again and retry."
+
+        exit 1
+    fi
+}
+
+function check_if_container_is_running {
+    if [ "$( docker container inspect -f '{{.State.Status}}' $CONTAINER_NAME )" == "running" ]; then
+        IS_CONTAINER_RUNNING=true
+    else
+        IS_CONTAINER_RUNNING=false
+    fi
+}
+
+function detect_docker_compose_command {
+    if ! command -v docker-compose &> /dev/null then
+        DOCKER_COMPOSE="docker compose"
+    else
+        DOCKER_COMPOSE="docker-compose"
+    fi
+}
+
+function exec_command {
+    if [ $# -eq 0 ]; then
+        help_command
+    fi
+
+    if [[ ${BASH_HANDLED_COMMANDS[@]} =~ "\<${1}\>" ]]; then
+        "${1}_command"
+    fi
+
+    if [[ "$IS_CONTAINER_RUNNING" == true ]] 
+        proxy_command_to_php
+    else
+        if [[ ${HELP_ALIASES[@]} =~ "\<${1}\>" ]]; then
+            help_command
+        else
+            echo "Invalid command $1"
+            echo
+            help_command "$1"
+        fi
+    fi
+}
+
+function help_command {
+    echo "Spin8 Help:"
+    echo
+    echo "The container is not running, that's either because you are installing Spin8 for the first time (in this case run 'spin8 install') or you forgot to run 'spin8 up'"
+    echo "In this state, you can access these commands:"
+    echo
+    echo "spin8 install    -    launch the Spin8 installation wizard"
+    echo "spin8 up         -    start the Spin8 containers"
+    echo "spin8 down       -    stop the Spin8 containers"
+    echo 
+    echo "Access more commands by running the container"
+
+    exit 1
+}
+
+function install_command {
+    echo "INSTALL"
+
+    exit 1
+}
+
+function up_command {
+    echo "UP"
+
+    exit 1
+}
+
+function down_command {
+    echo "DOWN"
+
+    exit 1
+}
+
+function proxy_command_to_php {
+    load_env_file
+
+    if [[ "$1" == "php" ]]; then
+        shift 1
+    fi
+
+    "docker exec $CONTAINER_NAME $PLUGIN_ABS_PATH/vendor/bin/spin8 $@"
+}
+
+function load_env_file {
+    set -a
+    . ./.env
+    set +a
+}
+
+
+
+check_kernel
+check_if_docker_is_running
+check_if_docker_compose_exists
+check_if_container_is_running
+exec_command
