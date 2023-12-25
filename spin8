@@ -53,7 +53,7 @@ function check_if_docker_compose_exists {
 }
 
 function check_if_container_is_running {
-    if docker ps -q -f name="$CONTAINER_NAME" | grep "$CONTAINER_NAME" 2> /dev/null; then
+    if [[ ! -z $( docker ps -f name="$CONTAINER_NAME" | grep "$CONTAINER_NAME" 2> /dev/null ) ]]; then
         IS_CONTAINER_RUNNING=true
     else
         IS_CONTAINER_RUNNING=false
@@ -74,14 +74,15 @@ function exec_command {
     fi
 
     if [[ "$1" == 'install' || "$1" == 'up' || "$1" == 'down' ]]; then
-        "${1}_command"
+        local COMMAND="${1}_command"
+
+        shift 1
+
+        "$COMMAND" $@
     fi
 
-
-
     if [[ "$IS_CONTAINER_RUNNING" == true ]]; then
-    echo "YES"
-        proxy_command_to_php
+        proxy_command_to_php $@
     else
         if [[ "$1" == "help" || "$1" == "-h" || "$1" == "-help" || "$1" == "--help" ]]; then
             help_command
@@ -117,25 +118,29 @@ function install_command {
 function up_command {
     detect_docker_compose_command
 
-    "$DOCKER_COMPOSE up -d" #FIXME
+    "$DOCKER_COMPOSE" "up" $@
 
     exit 1
 }
 
 function down_command {
-    echo "DOWN"
+    detect_docker_compose_command
+
+    "$DOCKER_COMPOSE" "down" $@
 
     exit 1
 }
 
 function proxy_command_to_php {
     load_env_file
-
+    
     if [[ "$1" == "php" ]]; then
         shift 1
     fi
 
-    "docker exec $CONTAINER_NAME $PLUGIN_ABS_PATH/vendor/bin/spin8 $@"
+    "docker" "exec" "$CONTAINER_NAME" "$PLUGIN_ABS_PATH/vendor/bin/spin8" $@
+
+    exit 1
 }
 
 function load_env_file {
