@@ -15,19 +15,19 @@ function check_kernel {
 
         *)                  
             KERNEL="unsupported"
-            display_usupported_kernel_message
+            display_unsupported_kernel_message
         ;;
     esac
 }
 
-function display_usupported_kernel_message {
+function display_unsupported_kernel_message {
     echo "Unsupported OS ($KERNEL)."
     echo "You won't be able to use spin8 install/build/up/down/recreate."
     echo
     echo "!!! If you are on windows, install and run Spin8 inside WSL2 to use all the features !!!"
     echo
     echo "You can still run Spin8 manually with these steps:" 
-    echo "1. copy the .env.example file and rename the coiped file .env" 
+    echo "1. copy the .env.example file and rename the copied file .env" 
     echo "2. customize the settings in the .env file" 
     echo "3. start the containers using 'docker compose up -d' or 'docker-compose up -d'" 
     echo "4. install and configure wordpress using 'docker exec spin8_wordpress spin8_install_wp'" 
@@ -110,7 +110,35 @@ function help_command {
 }
 
 function install_command {
-    echo "INSTALL"
+    echo "Welcome to the Spin8 Installation"
+    echo
+    
+    #PLUGIN NAME
+    echo "First of all, your plugin must have a name."
+    echo "That's just the display name of the plugin, so you can put spaces, special characters, ..."
+    read -p "Enter the name of your plugin (default: Spin8 Dev): " INST_PLUGIN_NAME
+    if [[ -z "$INST_PLUGIN_NAME" ]]; then 
+        local INST_PLUGIN_NAME='Spin8 Dev'
+    fi
+
+    echo
+    echo
+    echo
+
+    #PLUGIN SLUG
+    local GENERATED_PLUGIN_SLUG=spin8-dev
+    if command -v iconv > /dev/null 2>&1 && command -v tr > /dev/null 2>&1; then
+        local GENERATED_PLUGIN_SLUG=$( echo "${INST_PLUGIN_NAME//[._ ]/-}" | tr '[:upper:]' '[:lower:]' | iconv -f utf8 -t ASCII//TRANSLIT )
+    fi
+    echo "Your plugin will also need a slug."
+    echo "A slug is a unique identifier, used by WordPress to univocally refer to your plugin and avoid collisions with other plugins."
+    echo "Slugs can only contain lowercase letters and numbers, any special character besides the hyphen (-) is forbidden. [a-z0-9-]"
+    echo "For this reason, please provide a slug that will most likely be unused by others."
+    echo "Usually, the slug is the lowercase display name with stripped accents and spaces replaced with hyphens."
+    read -p "Enter the slug for your plugin (generated: $GENERATED_PLUGIN_SLUG): " INST_PLUGIN_NAME
+    if [[ -z "$INST_PLUGIN_SLUG" ]]; then 
+        local INST_PLUGIN_SLUG="$GENERATED_PLUGIN_SLUG"
+    fi
 
     exit 1
 }
