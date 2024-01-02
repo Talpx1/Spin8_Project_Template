@@ -54,7 +54,7 @@ Theoretically, you can develop your Spin8 project without running the container,
 
 While you could customize the `docker-compose.yml`, it's a good idea to leave it as it is, because the spin8 binary and some other important scripts rely on the default configuration to run correctly.   
 
-If you are using Visual Studio Code as your 'IDE', you can choose to open the project folder directly from the container (attach to the running container) or from the WSL2, in case ypu are using it. Some useful guides on that regard:  
+If you are using Visual Studio Code as your 'IDE', you can choose to open the project folder directly from the container (attach to the running container) or from the WSL2, in case you are using it. Some useful guides on that regard:  
 - https://code.visualstudio.com/docs/devcontainers/containers  
 - https://code.visualstudio.com/docs/devcontainers/attach-container  
 - https://code.visualstudio.com/docs/remote/wsl  
