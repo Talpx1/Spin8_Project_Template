@@ -3,42 +3,53 @@ services:
   #wordpress
   wordpress:
     container_name: spin8_wordpress
-    image: talpx1/spin8_wordpress:${WORDPRESS_VERSION:-6.4.2}-php${PHP_VERSION:-8.3}-${WEBSERVER_VERSION:-apache}
+    image: talpx1/spin8_wordpress:${PHP_VERSION:-8.3}-${WEBSERVER_VERSION:-apache}
+    build:
+      args:
+        WWW_GROUP_ID: '${WWW_GROUP_ID:-1000}'
+        WWW_USER_ID: '${WWW_USER_ID:-${UID:-1000}}'
     environment:
+      - WORDPRESS_VERSION=${WORDPRESS_VERSION:-6.4.2}
       - WORDPRESS_DB_HOST=${DATABASE_HOST:-spin8_mariadb}
       - WORDPRESS_DB_USER=${DATABASE_USER:-spin8}
       - WORDPRESS_DB_NAME=${DATABASE_NAME:-wp_spin8}
       - WORDPRESS_DB_PASSWORD=${DATABASE_PASSWORD:-spin8}
       - WORDPRESS_TABLE_PREFIX=${DATABASE_TABLE_PREFIX:-wp_}
       - WORDPRESS_LOCALE=${WORDPRESS_LOCALE:-en_US}
-      - WORDPRESS_WEBSITE_TITLE=${WORDPRESS_WEBSITE_TITLE:-Spin8 Test}
+      - WORDPRESS_WEBSITE_TITLE=${WORDPRESS_WEBSITE_TITLE:-Spin8 Dev}
       - WORDPRESS_WEBSITE_URL=${WORDPRESS_WEBSITE_URL:-http://localhost}
       - WORDPRESS_WEBSITE_URL_WITHOUT_HTTP=${WORDPRESS_WEBSITE_URL_WITHOUT_HTTP:-localhost}
       - WORDPRESS_WEBSITE_POST_URL_STRUCTURE=${WORDPRESS_WEBSITE_POST_URL_STRUCTURE:-/%postname%/}
       - WORDPRESS_ADMIN_USER=${WORDPRESS_ADMIN_USER:-spin8}
       - WORDPRESS_ADMIN_PASSWORD=${WORDPRESS_ADMIN_PASSWORD:-spin8}
-      - WORDPRESS_ADMIN_EMAIL=${WORDPRESS_ADMIN_EMAIL:-test@spin8.test}
+      - WORDPRESS_ADMIN_EMAIL=${WORDPRESS_ADMIN_EMAIL:-test@spin8.dev}
       - PLUGIN_NAME=${PLUGIN_NAME:-Spin8 Dev}
       - PLUGIN_SLUG=${PLUGIN_SLUG:-spin8-dev}
       - PLUGIN_NAMESPACE=${PLUGIN_NAMESPACE:-Spin8Dev}
       - PLUGIN_FOLDER=${PLUGIN_FOLDER:-${PLUGIN_SLUG}}
       - PLUGIN_ABS_PATH=${PLUGIN_ABS_PATH:-/var/www/html/wp-content/plugins/${PLUGIN_FOLDER}}
+      - WWW_USER_ID=${WWW_USER_ID:-${UID:-1000}}
+      - WWW_GROUP_ID=${WWW_GROUP_ID:-1000}
     ports:
       - ${WEBSERVER_PORT:-80}:80
+    networks:
+      - spin8
     restart: always
     depends_on:
       - mariadb
     volumes:
       - wp_data:/var/www/html
       - .:${PLUGIN_ABS_PATH}
-      - ${SSH_PATH}/${SSH_KEY_NAME}.pub:/root/.ssh/${SSH_KEY_NAME}.pub
-      - ${SSH_PATH}/${SSH_KEY_NAME}:/root/.ssh/${SSH_KEY_NAME}
+      - ${SSH_PATH}/${SSH_KEY_NAME}.pub:/home/spin8/.ssh/${SSH_KEY_NAME}.pub
+      - ${SSH_PATH}/${SSH_KEY_NAME}:/home/spin8/.ssh/${SSH_KEY_NAME}
   #mariadb
   mariadb:
     container_name: spin8_mariadb
     image: mariadb:${MARIADB_VERSION:-latest}
     ports:
       - ${DATABASE_PORT:-3306}:3306
+    networks:
+      - spin8
     restart: always
     environment:
       - MARIADB_DATABASE=${DATABASE_NAME:-wp_spin8}
@@ -49,6 +60,9 @@ services:
       - MARIADB_ROOT_HOST=localhost
     volumes:
       - db_data:/var/lib/mysql
+networks:
+  spin8:
+    driver: bridge
 volumes:
   db_data:
   wp_data:
