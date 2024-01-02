@@ -30,7 +30,7 @@ function display_unsupported_kernel_message {
     echo "1. copy the .env.example file and rename the copied file .env" 
     echo "2. customize the settings in the .env file" 
     echo "3. start the containers using 'docker compose up -d' or 'docker-compose up -d'" 
-    echo "4. install and configure wordpress using 'docker exec spin8_wordpress spin8_install_wp'" 
+    echo "4. install and configure wordpress using 'docker exec $CONTAINER_NAME spin8_install_wp'" 
     echo "5. use any other Spin8 command via './vendor/bin/spin8 <command>'" 
 
     exit 1
@@ -39,6 +39,7 @@ function display_unsupported_kernel_message {
 function check_if_docker_is_running {
     if ! docker info > /dev/null 2>&1; then
         echo "Docker is not running, please start docker and try again."
+
         exit 1
     fi
 }
@@ -106,11 +107,15 @@ function help_command {
     echo 
     echo "Access more commands by running the container"
 
-    exit 1
+    exit 3
 }
 
 function install_command {
     echo "Welcome to the Spin8 Installation"
+    echo
+    echo "This guided installation will help you configure the needed settings to build your plugin."
+    echo "You will also be provided with default or generated values for the settings that you will be asked."
+    echo "In case those default/generated values encounter your necessities, just type nothing and press Enter."
     echo
     
     #PLUGIN NAME
@@ -135,20 +140,174 @@ function install_command {
     echo "Slugs can only contain lowercase letters and numbers, any special character besides the hyphen (-) is forbidden. [a-z0-9-]"
     echo "For this reason, please provide a slug that will most likely be unused by others."
     echo "Usually, the slug is the lowercase display name with stripped accents and spaces replaced with hyphens."
-    read -p "Enter the slug for your plugin (generated: $GENERATED_PLUGIN_SLUG): " INST_PLUGIN_NAME
+    read -p "Enter the slug for your plugin (generated: $GENERATED_PLUGIN_SLUG): " INST_PLUGIN_SLUG
     if [[ -z "$INST_PLUGIN_SLUG" ]]; then 
         local INST_PLUGIN_SLUG="$GENERATED_PLUGIN_SLUG"
     fi
 
-    exit 1
+    echo
+    echo
+    echo
+
+    #PLUGIN NAMESPACE
+    local GENERATED_PLUGIN_NAMESPACE=Spin8Dev
+    if command -v sed > /dev/null 2>&1 && command -v tr > /dev/null 2>&1; then
+        local GENERATED_PLUGIN_NAMESPACE=$( echo "$INST_PLUGIN_SLUG" | sed -e 's/\b./\U&/g' | tr -d '-' )
+    fi
+    echo "In order for yor plugin classes to not clash with other plugin's classes, you need a unique namespace."
+    echo "A namespace is similar to a slug, but instead of using it to uniquely identify your plugin, it's used to group all your plugin classes under the same family."
+    echo "This is useful to let PHP know that all those classes belong to your plugin, and to search those classes only in tour plugin package."
+    echo "Pretty often, the namespace (we are talking about the root namespace) is your plugin name, without spaces and written in pascal case notation."
+    echo "It's also fine to use your slug, removing the hyphens and following the pascal case convention."
+    read -p "Enter the namespace for your plugin (generated: $GENERATED_PLUGIN_NAMESPACE): " INST_PLUGIN_NAMESPACE
+    if [[ -z "$INST_PLUGIN_NAMESPACE" ]]; then 
+        local INST_PLUGIN_NAMESPACE="$GENERATED_PLUGIN_NAMESPACE"
+    fi
+    
+    echo
+    echo
+    echo
+
+    #PLUGIN FOLDER
+    echo "Now you will need to specify the name of the folder containing your plugin."
+    echo "It's STRONGLY recommended to use the same value of the slug, other settings may cause problem with how WordPress works."
+    echo "If you do not have particular necessities, just accept the default value proposed."
+    read -p "Enter name for your plugin folder (default: $INST_PLUGIN_SLUG): " INST_PLUGIN_FOLDER
+    if [[ -z "$INST_PLUGIN_FOLDER" ]]; then 
+        local INST_PLUGIN_FOLDER="$INST_PLUGIN_SLUG"
+    fi
+
+    echo
+    echo
+    echo
+
+    #PLUGIN ABS PATH
+    echo "If you want or need to, you can now specify the absolute path where your plugin will be located."
+    echo "In case you decide to manually define this, DO NOT specify the folder name again, as it will be automatically appended."
+    echo "Just make sure to add a trailing slash to your path."
+    echo "Like before, it's HEAVILY recommended to stick with the default value."
+    read -p "Enter the absolute path, without folder, where your plugin will be located (default: /var/www/html/wp-content/plugins/): " INST_PLUGIN_ABS_PATH
+    if [[ -z "$INST_PLUGIN_ABS_PATH" ]]; then 
+        local INST_PLUGIN_ABS_PATH="/var/www/html/wp-content/plugins/"
+    fi
+    local INST_PLUGIN_ABS_PATH+="$INST_PLUGIN_FOLDER"
+
+    echo
+    echo
+    echo
+
+    #SSH
+    local CLONE_SSH_KEYS=''
+    while [[ "$CLONE_SSH_KEYS" != "N" && "$CLONE_SSH_KEYS" != "n" && "$CLONE_SSH_KEYS" != "Y" && "$CLONE_SSH_KEYS" != "y" ]]; do
+        read -p "Would you like to clone your SSH key in the container? (useful, fo example, to access your GitHub repo) (Y/N): " CLONE_SSH_KEYS
+    done
+
+    echo
+    echo
+    echo
+
+    if [[ "$CLONE_SSH_KEYS" == "Y" || "$CLONE_SSH_KEYS" == "y" ]]; then
+        #SSH PATH
+        if [ ! -z "${HOME}" ]; then
+            local GENERATED_SSH_PATH="$HOME/.ssh"
+        elif [ ! -z "${USER}" ]; then
+            local GENERATED_SSH_PATH="/home/$USER/.ssh"
+        elif command -v whoami > /dev/null 2>&1; then
+            local GENERATED_SSH_PATH="/home/$(whoami)/.ssh"
+        else
+            echo "The HOME and USER variables are unset and the whoami command is unavailable."
+            echo "Unable to generate the default suggestion for the ssh path, you will have to enter it manually."
+        fi
+
+        echo "Specify the path where your ssh key is stored (useful, fo example, to access your GitHub repo)."
+        echo "Do not add the ssh key file name to this path."
+        echo "If unsure, you are probably fine with the default."
+        read -p "SSH key path (default: $GENERATED_SSH_PATH): " INST_SSH_PATH
+        if [[ -z "$INST_SSH_PATH" ]]; then 
+            local INST_SSH_PATH="$GENERATED_SSH_PATH"
+        fi
+
+        echo
+        echo
+        echo
+
+        #SSH KEY NAME
+        echo "Specify name of the ssh key to copy. Do not add the file extension."
+        echo "If unsure, you are probably fine with the default again."
+        read -p "SSH key name (default id_ed25519): " INST_SSH_KEY_NAME
+        if [[ -z "$INST_SSH_KEY_NAME" ]]; then 
+            local INST_SSH_KEY_NAME="id_ed25519"
+        fi
+    fi
+
+    echo
+    echo
+    echo
+
+    #WORDPRESS VERSION
+    echo "You can now enter the WordPress version that will be installed and used to test your plugin."
+    echo "Valid values are 'latest', 'nightly' or a version number"
+    read -p "Enter the WordPress version (default: latest): " INST_WORDPRESS_VERSION
+    if [[ -z "$INST_WORDPRESS_VERSION" ]]; then 
+        local INST_WORDPRESS_VERSION="latest"
+    fi
+    
+    echo
+    echo
+    echo
+
+    #WORDPRESS LOCALE
+    echo "You can choose in which language you would prefer your WordPress installation to be."
+    echo "You can find the available language codes here: https://translate.wordpress.org/"
+    read -p "Enter the language code for your WordPress installation (default: en_US): " INST_WORDPRESS_LOCALE
+    if [[ -z "$INST_WORDPRESS_LOCALE" ]]; then 
+        local INST_WORDPRESS_LOCALE="en_US"
+    fi
+
+    echo
+    echo
+    echo
+
+    #creating the .env file
+    echo "Generating the .env file..."
+    cp .env.example .env
+    sed -i 's/^PLUGIN_NAME=/s/=.*/="$INST_PLUGIN_NAME"/' .env
+    sed -i 's/^PLUGIN_SLUG=/s/=.*/="$INST_PLUGIN_SLUG"/' .env
+    sed -i 's/^PLUGIN_NAMESPACE=/s/=.*/="$INST_PLUGIN_NAMESPACE"/' .env
+    sed -i 's/^PLUGIN_FOLDER=/s/=.*/="$INST_PLUGIN_FOLDER"/' .env
+    sed -i 's/^PLUGIN_ABS_PATH=/s/=.*/="$INST_PLUGIN_ABS_PATH"/' .env
+    sed -i 's/^WORDPRESS_VERSION=/s/=.*/="$INST_WORDPRESS_VERSION"/' .env
+    sed -i 's/^WORDPRESS_LOCALE=/s/=.*/="$INST_WORDPRESS_LOCALE"/' .env
+
+    if [[ "$CLONE_SSH_KEYS" == "Y" || "$CLONE_SSH_KEYS" == "y" ]]; then
+        sed -i 's/^SSH_PATH=/s/=.*/="$INST_SSH_PATH"/' .env
+        sed -i 's/^SSH_KEY_NAME=/s/=.*/="$INST_SSH_KEY_NAME"/' .env
+    fi
+
+    #renaming plugin file
+    echo "Renaming plugin file..."
+    mv "plugin-name.php" "$INST_PLUGIN_NAME.php"
+
+    #starting containers
+    up_command "-d"
+
+    #installing WordPress
+    docker "exec" "$CONTAINER_NAME" "spin8_install_wp"
+
+    #installing plugin dependencies
+    docker "exec" "$CONTAINER_NAME" "composer" "install" "--working-dir=$PLUGIN_ABS_PATH"
+
+    exit 0
 }
 
 function up_command {
     detect_docker_compose_command
 
-    "$DOCKER_COMPOSE" "up" $@
+    load_env_file
 
-    exit 1
+    "$DOCKER_COMPOSE" "up" $@
+    
+    exit 0
 }
 
 function down_command {
@@ -156,7 +315,7 @@ function down_command {
 
     "$DOCKER_COMPOSE" "down" $@
 
-    exit 1
+    exit 0
 }
 
 function proxy_command_to_php {
@@ -168,10 +327,16 @@ function proxy_command_to_php {
 
     "docker" "exec" "$CONTAINER_NAME" "$PLUGIN_ABS_PATH/vendor/bin/spin8" $@
 
-    exit 1
+    exit 0
 }
 
 function load_env_file {
+    export WWW_GROUP_ID=${WWW_GROUP_ID:-"$(id -g)"}
+
+    if [[ -z "$UID" ]]; then
+        export UID="$(id -u)"
+    fi
+
     set -a
     . ./.env
     set +a
