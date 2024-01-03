@@ -1,7 +1,7 @@
 <?php declare(strict_types=1);
 
 /**
- * $PLUGIN_NAME
+ * %PLUGIN_NAME%
  *
  * @package           %PLUGIN_NAMESPACE%
  * @author            %PLUGIN_AUTHOR%
