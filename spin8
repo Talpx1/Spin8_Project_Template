@@ -69,28 +69,35 @@ function detect_docker_compose_command {
     fi
 }
 
-function exec_command {
+function resolve_command_form_args {
     if [ $# -eq 0 ]; then
         help_command
+        
+        exit 3
     fi
 
-    if [[ "$1" == 'install' || "$1" == 'up' || "$1" == 'down' ]]; then
+    if [[ "$1" == 'install' || "$1" == 'up' || "$1" == 'down' || "$1" == 'execute' "$1" == 'bash' ]]; then
         local COMMAND="${1}_command"
 
         shift 1
 
         "$COMMAND" $@
+
+        exit 0
     fi
 
     if [[ "$IS_CONTAINER_RUNNING" == true ]]; then
         proxy_command_to_php $@
+        exit 0
     else
         if [[ "$1" == "help" || "$1" == "-h" || "$1" == "-help" || "$1" == "--help" ]]; then
             help_command
+            exit 3
         else
             echo "Invalid command $1"
             echo
             help_command
+            exit 3
         fi
     fi
 }
@@ -104,10 +111,10 @@ function help_command {
     echo "spin8 install    -    launch the Spin8 installation wizard"
     echo "spin8 up         -    start the Spin8 containers"
     echo "spin8 down       -    stop the Spin8 containers"
+    echo "spin8 bash       -    access the container terminal (use 'spin8 bash root' to access the terminal as root)"
+    echo "spin8 execute    -    execute a command in the container (use 'spin8 execute root' to execute a command as root)"
     echo 
     echo "Access more commands by running the container"
-
-    exit 3
 }
 
 function install_command {
@@ -234,7 +241,7 @@ function install_command {
         #SSH KEY NAME
         echo "Specify name of the ssh key to copy. Do not add the file extension."
         echo "If unsure, you are probably fine with the default again."
-        read -p "SSH key name (default id_ed25519): " INST_SSH_KEY_NAME
+        read -p "SSH key name (default: id_ed25519): " INST_SSH_KEY_NAME
         if [[ -z "$INST_SSH_KEY_NAME" ]]; then 
             local INST_SSH_KEY_NAME="id_ed25519"
         fi
@@ -271,33 +278,32 @@ function install_command {
     #creating the .env file
     echo "Generating the .env file..."
     cp .env.example .env
-    sed -i 's/^PLUGIN_NAME=/s/=.*/="$INST_PLUGIN_NAME"/' .env
-    sed -i 's/^PLUGIN_SLUG=/s/=.*/="$INST_PLUGIN_SLUG"/' .env
-    sed -i 's/^PLUGIN_NAMESPACE=/s/=.*/="$INST_PLUGIN_NAMESPACE"/' .env
-    sed -i 's/^PLUGIN_FOLDER=/s/=.*/="$INST_PLUGIN_FOLDER"/' .env
-    sed -i 's/^PLUGIN_ABS_PATH=/s/=.*/="$INST_PLUGIN_ABS_PATH"/' .env
-    sed -i 's/^WORDPRESS_VERSION=/s/=.*/="$INST_WORDPRESS_VERSION"/' .env
-    sed -i 's/^WORDPRESS_LOCALE=/s/=.*/="$INST_WORDPRESS_LOCALE"/' .env
+    sed -i "/^PLUGIN_NAME=/s/=.*/='$INST_PLUGIN_NAME'/" .env
+    sed -i "/^PLUGIN_SLUG=/s/=.*/='$INST_PLUGIN_SLUG'/" .env
+    sed -i "/^PLUGIN_NAMESPACE=/s/=.*/='$INST_PLUGIN_NAMESPACE'/" .env
+    sed -i "/^PLUGIN_FOLDER=/s/=.*/='$INST_PLUGIN_FOLDER'/" .env
+    sed -i "/^PLUGIN_ABS_PATH=/s/=.*/='$INST_PLUGIN_ABS_PATH'/" .env
+    sed -i "/^WORDPRESS_VERSION=/s/=.*/='$INST_WORDPRESS_VERSION'/" .env
+    sed -i "/^WORDPRESS_LOCALE=/s/=.*/='$INST_WORDPRESS_LOCALE'/" .env
 
     if [[ "$CLONE_SSH_KEYS" == "Y" || "$CLONE_SSH_KEYS" == "y" ]]; then
-        sed -i 's/^SSH_PATH=/s/=.*/="$INST_SSH_PATH"/' .env
-        sed -i 's/^SSH_KEY_NAME=/s/=.*/="$INST_SSH_KEY_NAME"/' .env
+        sed -i "/^SSH_PATH=/s/=.*/='$INST_SSH_PATH'/" .env
+        sed -i "/^SSH_KEY_NAME=/s/=.*/='$INST_SSH_KEY_NAME'/" .env
     fi
 
     #renaming plugin file
     echo "Renaming plugin file..."
-    mv "plugin-name.php" "$INST_PLUGIN_NAME.php"
+    mv "plugin-name.php" "$INST_PLUGIN_SLUG.php"
 
     #starting containers
     up_command "-d"
+    sleep 5
 
     #installing WordPress
-    docker "exec" "$CONTAINER_NAME" "spin8_install_wp"
+    docker "exec" "-u" "$WWW_USER_ID" "$CONTAINER_NAME" "spin8_install_wp"
 
     #installing plugin dependencies
-    docker "exec" "$CONTAINER_NAME" "composer" "install" "--working-dir=$PLUGIN_ABS_PATH"
-
-    exit 0
+    docker "exec" "-u" "$WWW_USER_ID" "$CONTAINER_NAME" "composer" "install" "--working-dir=$PLUGIN_ABS_PATH"
 }
 
 function up_command {
@@ -305,17 +311,31 @@ function up_command {
 
     load_env_file
 
-    "$DOCKER_COMPOSE" "up" $@
-    
-    exit 0
+    "$DOCKER_COMPOSE" "up" "$@"
 }
 
 function down_command {
     detect_docker_compose_command
 
-    "$DOCKER_COMPOSE" "down" $@
+    load_env_file
 
-    exit 0
+    "$DOCKER_COMPOSE" "down" "$@"
+}
+
+function execute_command {
+
+    local USER='spin8'
+    if [[ "$1" == "root" ]]; then
+        local USER='root'
+        
+        shift 1
+    fi
+
+    docker "exec" "-u" "$USER" "$CONTAINER_NAME" "$@"
+}
+
+function bash_command {
+    execute_command "$@" "-it"
 }
 
 function proxy_command_to_php {
@@ -325,9 +345,7 @@ function proxy_command_to_php {
         shift 1
     fi
 
-    "docker" "exec" "$CONTAINER_NAME" "$PLUGIN_ABS_PATH/vendor/bin/spin8" $@
-
-    exit 0
+    "docker" "exec" "$CONTAINER_NAME" "$PLUGIN_ABS_PATH/vendor/bin/spin8" "$@"
 }
 
 function load_env_file {
@@ -336,6 +354,8 @@ function load_env_file {
     if [[ -z "$UID" ]]; then
         export UID="$(id -u)"
     fi
+
+    export WWW_USER_ID=${WWW_USER_ID:-${UID:-"$(id -g)"}}
 
     set -a
     . ./.env
@@ -348,4 +368,4 @@ check_kernel
 check_if_docker_is_running
 check_if_docker_compose_exists
 check_if_container_is_running
-exec_command $@
+resolve_command_form_args $@
