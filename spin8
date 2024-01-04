@@ -76,7 +76,7 @@ function resolve_command_form_args {
         exit 3
     fi
 
-    if [[ "$1" == 'install' || "$1" == 'up' || "$1" == 'down' || "$1" == 'execute' "$1" == 'bash' ]]; then
+    if [[ "$1" == 'install' || "$1" == 'up' || "$1" == 'down' || "$1" == 'execute' || "$1" == 'bash' ]]; then
         local COMMAND="${1}_command"
 
         shift 1
@@ -132,6 +132,8 @@ function install_command {
     if [[ -z "$INST_PLUGIN_NAME" ]]; then 
         local INST_PLUGIN_NAME='Spin8 Dev'
     fi
+    local INST_PLUGIN_NAME=$(printf '%s\n' "$INST_PLUGIN_NAME" | sed -e 's/[\/&]/\\&/g')
+
 
     echo
     echo
@@ -151,6 +153,7 @@ function install_command {
     if [[ -z "$INST_PLUGIN_SLUG" ]]; then 
         local INST_PLUGIN_SLUG="$GENERATED_PLUGIN_SLUG"
     fi
+    local INST_PLUGIN_SLUG=$(printf '%s\n' "$INST_PLUGIN_SLUG" | sed -e 's/[\/&]/\\&/g')
 
     echo
     echo
@@ -170,6 +173,7 @@ function install_command {
     if [[ -z "$INST_PLUGIN_NAMESPACE" ]]; then 
         local INST_PLUGIN_NAMESPACE="$GENERATED_PLUGIN_NAMESPACE"
     fi
+    local INST_PLUGIN_NAMESPACE=$(printf '%s\n' "$INST_PLUGIN_NAMESPACE" | sed -e 's/[\/&]/\\&/g')
     
     echo
     echo
@@ -183,6 +187,7 @@ function install_command {
     if [[ -z "$INST_PLUGIN_FOLDER" ]]; then 
         local INST_PLUGIN_FOLDER="$INST_PLUGIN_SLUG"
     fi
+    local INST_PLUGIN_FOLDER=$(printf '%s\n' "$INST_PLUGIN_FOLDER" | sed -e 's/[\/&]/\\&/g')
 
     echo
     echo
@@ -198,6 +203,7 @@ function install_command {
         local INST_PLUGIN_ABS_PATH="/var/www/html/wp-content/plugins/"
     fi
     local INST_PLUGIN_ABS_PATH+="$INST_PLUGIN_FOLDER"
+    local INST_PLUGIN_ABS_PATH=$(printf '%s\n' "$INST_PLUGIN_ABS_PATH" | sed -e 's/[\/&]/\\&/g')
 
     echo
     echo
@@ -233,6 +239,7 @@ function install_command {
         if [[ -z "$INST_SSH_PATH" ]]; then 
             local INST_SSH_PATH="$GENERATED_SSH_PATH"
         fi
+        local INST_SSH_PATH=$(printf '%s\n' "$INST_SSH_PATH" | sed -e 's/[\/&]/\\&/g')
 
         echo
         echo
@@ -245,6 +252,7 @@ function install_command {
         if [[ -z "$INST_SSH_KEY_NAME" ]]; then 
             local INST_SSH_KEY_NAME="id_ed25519"
         fi
+        local INST_SSH_KEY_NAME=$(printf '%s\n' "$INST_SSH_KEY_NAME" | sed -e 's/[\/&]/\\&/g')
     fi
 
     echo
@@ -258,6 +266,7 @@ function install_command {
     if [[ -z "$INST_WORDPRESS_VERSION" ]]; then 
         local INST_WORDPRESS_VERSION="latest"
     fi
+    local INST_WORDPRESS_VERSION=$(printf '%s\n' "$INST_WORDPRESS_VERSION" | sed -e 's/[\/&]/\\&/g')
     
     echo
     echo
@@ -270,6 +279,7 @@ function install_command {
     if [[ -z "$INST_WORDPRESS_LOCALE" ]]; then 
         local INST_WORDPRESS_LOCALE="en_US"
     fi
+    local INST_WORDPRESS_LOCALE=$(printf '%s\n' "$INST_WORDPRESS_LOCALE" | sed -e 's/[\/&]/\\&/g')
 
     echo
     echo
@@ -304,6 +314,9 @@ function install_command {
 
     #installing plugin dependencies
     docker "exec" "-u" "$WWW_USER_ID" "$CONTAINER_NAME" "composer" "install" "--working-dir=$PLUGIN_ABS_PATH"
+
+    #generating plugin file's header comment
+    proxy_command_to_php "generate" "headers"
 }
 
 function up_command {
@@ -323,7 +336,6 @@ function down_command {
 }
 
 function execute_command {
-
     local USER='spin8'
     if [[ "$1" == "root" ]]; then
         local USER='root'
@@ -335,7 +347,14 @@ function execute_command {
 }
 
 function bash_command {
-    execute_command "$@" "-it"
+    local USER='spin8'
+    if [[ "$1" == "root" ]]; then
+        local USER='root'
+        
+        shift 1
+    fi
+
+    docker "exec" "-it" "-u" "$USER" "$CONTAINER_NAME" "bash"
 }
 
 function proxy_command_to_php {
