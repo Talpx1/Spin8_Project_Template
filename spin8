@@ -374,11 +374,13 @@ function load_env_file {
         export UID="$(id -u)"
     fi
 
-    export WWW_USER_ID=${WWW_USER_ID:-${UID:-"$(id -g)"}}
+    export WWW_USER_ID=${WWW_USER_ID:-${UID:-"$(id -u)"}}
 
-    set -a
-    . ./.env
-    set +a
+    if [[ -f "./.env" ]]; then
+        set -a
+        . ./.env
+        set +a
+    fi
 }
 
 
