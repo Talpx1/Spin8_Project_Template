@@ -29,7 +29,7 @@ It's also handy to have Git (https://git-scm.com/) or GitHub CLI (https://cli.gi
    - from the GitHub page of this repo, download the source as zip and extract the content in the project's folder.  
    - from the GitHub page of this repo, use the `Use this template` button and select the `Create a new repository` option.  
    - using the GitHub CLI tool, run `gh repo create <new-repo-name> --template="Talpx1/Spin8_Project_Template"`.  
-3. (not required, but recommended) add `alias spin8='bash spin8'` to your `~/.zshrc` or `~/.bashrc`, and then restart your shell.  
+3. (not required, but recommended) add `alias spin8='bash spin8'` to your `~/.zshrc` or `~/.bashrc` or `~/.bash_aliases`, if present, and then restart your shell.  
 4. run `spin8 install` (or `bash spin8 install` if you skipped step 3) and follow the instructions.  
 5. visit http://localhost to try your plugin while developing.    
 
