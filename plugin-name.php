@@ -22,4 +22,16 @@
  * Text Domain:       %PLUGIN_SLUG%
  * Domain Path:       /languages
  * Update URI:        %PLUGIN_UPDATE_URI%
- */
+*/
+
+defined('ABSPATH') || die('[%PLUGIN_NAME%] Direct access is not allowed!');
+
+$autoloader = __DIR__.'/vendor/autoload.php';
+
+if (!file_exists($autoloader) || !is_readable($autoloader)) {
+    throw new RuntimeException("[%PLUGIN_NAME%] Can't require the autoloader in ".basename(__FILE__).", it's either missing or non-readable. Check the autoloader in {$autoloader}");
+}
+
+require_once $autoloader;
+
+require_once __DIR__.'/vendor/spin8/framework/src/bootstrap.php';
