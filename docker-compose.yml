@@ -32,8 +32,15 @@ services:
       - ${WEBSERVER_PORT:-80}:80
     networks:
       - spin8
+    healthcheck:
+      test: "curl -f http://localhost"
+      start_period: 10s
+      interval: 10s
+      timeout: 5s
+      retries: 3
     depends_on:
-      - mariadb
+      mariadb:
+        condition: service_healthy
     volumes:
       - wp_data:/var/www/html
       - .:${PLUGIN_ABS_PATH}
@@ -53,6 +60,18 @@ services:
       - MARIADB_ROOT_PASSWORD=root
       - MARIADB_ALLOW_EMPTY_ROOT_PASSWORD=''
       - MARIADB_ROOT_HOST=localhost
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "healthcheck.sh",
+          "--connect",
+          "--innodb_initialized"
+        ]
+      start_period: 10s
+      interval: 10s
+      timeout: 5s
+      retries: 3
     volumes:
       - db_data:/var/lib/mysql
 networks:

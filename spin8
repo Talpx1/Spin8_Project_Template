@@ -1,8 +1,5 @@
 #!/usr/bin/env bash
 
-KERNEL="$(uname -s)"
-CONTAINER_NAME="spin8_wordpress"
-
 function check_kernel {
     case "$KERNEL" in
         Linux*) 
@@ -22,15 +19,15 @@ function check_kernel {
 
 function display_unsupported_kernel_message {
     echo "Unsupported OS ($KERNEL)."
-    echo "You won't be able to use spin8 install/build/up/down/recreate."
+    echo "You won't be able to use spin8 commands."
     echo
-    echo "!!! If you are on windows, install and run Spin8 inside WSL2 to use all the features !!!"
+    echo "!!! If you are on windows, install and run Spin8 inside WSL2 to use all the commands !!!"
     echo
     echo "You can still run Spin8 manually with these steps:" 
     echo "1. copy the .env.example file and rename the copied file .env" 
     echo "2. customize the settings in the .env file" 
     echo "3. start the containers using 'docker compose up -d' or 'docker-compose up -d'" 
-    echo "4. install and configure wordpress using 'docker exec $CONTAINER_NAME spin8_install_wp'" 
+    echo "4. install and configure wordpress using 'docker exec <wordpress_container_name> spin8_install_wp'" 
     echo "5. use any other Spin8 command via './vendor/bin/spin8 <command>'" 
 
     exit 1
@@ -54,7 +51,7 @@ function check_if_docker_compose_exists {
 }
 
 function check_if_container_is_running {
-    if [[ ! -z $( docker ps -f name="$CONTAINER_NAME" | grep "$CONTAINER_NAME" 2> /dev/null ) ]]; then
+    if [[ ! -z $( docker ps -f name="$WP_CONTAINER_NAME" | grep "$WP_CONTAINER_NAME" 2> /dev/null ) ]]; then
         IS_CONTAINER_RUNNING=true
     else
         IS_CONTAINER_RUNNING=false
@@ -301,19 +298,22 @@ function install_command {
         sed -i "/^SSH_KEY_NAME=/s/=.*/='$INST_SSH_KEY_NAME'/" .env
     fi
 
+    load_env_file
+    generate_vars_dependant_on_env
+
     #renaming plugin file
     echo "Renaming plugin file..."
     mv "plugin-name.php" "$INST_PLUGIN_SLUG.php"
 
     #starting containers
     up_command "-d"
-    sleep 5
+    wait_until_containers_healthy
 
     #installing WordPress
-    docker "exec" "-u" "$WWW_USER_ID" "$CONTAINER_NAME" "spin8_install_wp"
+    docker "exec" "-u" "$WWW_USER_ID" "$WP_CONTAINER_NAME" "spin8_install_wp"
 
     #installing plugin dependencies
-    docker "exec" "-u" "$WWW_USER_ID" "$CONTAINER_NAME" "composer" "install" "--working-dir=$PLUGIN_ABS_PATH"
+    docker "exec" "-u" "$WWW_USER_ID" "$WP_CONTAINER_NAME" "composer" "install" "--working-dir=$PLUGIN_ABS_PATH"
 
     #generating plugin file's header comment
     proxy_command_to_php "generate" "headers"
@@ -322,15 +322,11 @@ function install_command {
 function up_command {
     detect_docker_compose_command
 
-    load_env_file
-
     "$DOCKER_COMPOSE" "up" "$@"
 }
 
 function down_command {
     detect_docker_compose_command
-
-    load_env_file
 
     "$DOCKER_COMPOSE" "down" "$@"
 }
@@ -343,7 +339,7 @@ function execute_command {
         shift 1
     fi
 
-    docker "exec" "-u" "$USER" "$CONTAINER_NAME" "$@"
+    docker "exec" "-u" "$USER" "$WP_CONTAINER_NAME" "$@"
 }
 
 function bash_command {
@@ -354,17 +350,15 @@ function bash_command {
         shift 1
     fi
 
-    docker "exec" "-it" "-u" "$USER" "$CONTAINER_NAME" "bash"
+    docker "exec" "-it" "-u" "$USER" "$WP_CONTAINER_NAME" "bash"
 }
 
-function proxy_command_to_php {
-    load_env_file
-    
+function proxy_command_to_php {    
     if [[ "$1" == "php" ]]; then
         shift 1
     fi
 
-    "docker" "exec" "$CONTAINER_NAME" "$PLUGIN_ABS_PATH/vendor/bin/spin8" "$@"
+    "docker" "exec" "$WP_CONTAINER_NAME" "$PLUGIN_ABS_PATH/vendor/bin/spin8" "$@"
 }
 
 function load_env_file {
@@ -383,8 +377,30 @@ function load_env_file {
     fi
 }
 
+function wait_until_containers_healthy() {
+    local containers=($DB_CONTAINER_NAME $WP_CONTAINER_NAME)
+    for container in "${containers[@]}"
+    do
+        until
+            [ "$(docker inspect --format "{{.State.Health.Status}}" "$container")" = 'healthy' ]
+        do
+            local container_status
+            container_status="$(docker inspect --format "{{.State.Health.Status}}" "$container")"
 
+            echo "Waiting for container $container to be 'healthy', current status is '$container_status'. Next check in five seconds..."
+            sleep 5
+        done
+    done
+}
 
+function generate_vars_dependant_on_env(){
+    WP_CONTAINER_NAME="${COMPOSE_PROJECT_NAME}-wordpress-1"
+    DB_CONTAINER_NAME="${COMPOSE_PROJECT_NAME}-mariadb-1"
+}
+
+load_env_file
+KERNEL="$(uname -s)"
+generate_vars_dependant_on_env
 check_kernel
 check_if_docker_is_running
 check_if_docker_compose_exists
