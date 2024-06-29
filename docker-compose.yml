@@ -1,7 +1,6 @@
 services:
   #wordpress
   wordpress:
-    container_name: spin8_wordpress
     image: talpx1/spin8_wordpress:${PHP_VERSION:-8.3}-${WEBSERVER_VERSION:-apache}
     build:
       args:
@@ -42,7 +41,6 @@ services:
       - ${SSH_PATH}/${SSH_KEY_NAME}:/home/spin8/.ssh/${SSH_KEY_NAME}
   #mariadb
   mariadb:
-    container_name: spin8_mariadb
     image: mariadb:${MARIADB_VERSION:-latest}
     ports:
       - ${DATABASE_PORT:-3306}:3306
